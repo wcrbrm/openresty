@@ -78,6 +78,8 @@ LABEL resty_eval_post_make="${RESTY_EVAL_POST_MAKE}"
 # 3) Build OpenResty
 # 4) Cleanup
 
+ENV MAXMIND_VERSION=1.2.1
+
 RUN apk add --no-cache --virtual .build-deps \
         alpine-sdk \
         build-base \
@@ -97,19 +99,16 @@ RUN apk add --no-cache --virtual .build-deps \
         libxslt \
         perl-dev \
         zlib \
-        ${RESTY_ADD_PACKAGE_RUNDEPS}
-
-ENV MAXMIND_VERSION=1.2.1
-RUN git clone --depth=1 https://github.com/leev/ngx_http_geoip2_module /ngx_http_geoip2_module \
+        ${RESTY_ADD_PACKAGE_RUNDEPS} \
+    && git clone --depth=1 https://github.com/leev/ngx_http_geoip2_module /ngx_http_geoip2_module \
     && wget https://github.com/maxmind/libmaxminddb/releases/download/${MAXMIND_VERSION}/libmaxminddb-${MAXMIND_VERSION}.tar.gz \
     && tar xf libmaxminddb-${MAXMIND_VERSION}.tar.gz \
     && cd libmaxminddb-${MAXMIND_VERSION} \
     && ./configure \
     && make \
     && make check \
-    && make install
-RUN ldconfig || :
-RUN cd /tmp \
+    && make install && (ldconfig || true) \
+    && cd /tmp \
     && if [ -n "${RESTY_EVAL_PRE_CONFIGURE}" ]; then eval $(echo ${RESTY_EVAL_PRE_CONFIGURE}); fi \
     && curl -fSL https://www.openssl.org/source/openssl-${RESTY_OPENSSL_VERSION}.tar.gz -o openssl-${RESTY_OPENSSL_VERSION}.tar.gz \
     && tar xzf openssl-${RESTY_OPENSSL_VERSION}.tar.gz \
@@ -123,17 +122,15 @@ RUN cd /tmp \
         --enable-utf \
         --enable-unicode-properties \
     && make -j${RESTY_J} \
-    && make -j${RESTY_J} install 
-    
-RUN cd /tmp \
+    && make -j${RESTY_J} install \
+    && cd /tmp \
     && curl -fSL https://openresty.org/download/openresty-${RESTY_VERSION}.tar.gz -o openresty-${RESTY_VERSION}.tar.gz \
     && tar xzf openresty-${RESTY_VERSION}.tar.gz \
     && cd /tmp/openresty-${RESTY_VERSION} \
     && eval ./configure -j${RESTY_J} ${_RESTY_CONFIG_DEPS} ${RESTY_CONFIG_OPTIONS} ${RESTY_CONFIG_OPTIONS_MORE} ${RESTY_LUAJIT_OPTIONS} \
     && make -j${RESTY_J} \
-    && make -j${RESTY_J} install
-
-RUN cd /tmp \
+    && make -j${RESTY_J} install \
+    && cd /tmp \
     && if [ -n "${RESTY_EVAL_POST_MAKE}" ]; then eval $(echo ${RESTY_EVAL_POST_MAKE}); fi \
     && rm -rf \
         openssl-${RESTY_OPENSSL_VERSION} \
